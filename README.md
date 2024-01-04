@@ -1,17 +1,12 @@
-# EC-CUBE4.2系開発環境
+# EC-CUBE4.2系開発環境 
 
 Gitpod対応　EC-CUBE4.2系開発環境
 
-## Gitpod起動
+## Gitpod起動手順
 アドレスバー"github.com"の前に"gitpod.io#"を追加
 
-## Local環境構築
-```bash
-$ make init #初回
-$ make migrate #マイグレーション
+## Local環境構築手順
 
-$ make up # 開発時
-```
 
 ### バージョン
 - PHP 8.0
@@ -21,6 +16,3 @@ $ make up # 開発時
 - node 16
 
 ### アカウント
-```
-初期 admin@mail.addr ／ 123123
-```
