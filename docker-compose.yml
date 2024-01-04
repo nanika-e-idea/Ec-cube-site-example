@@ -1,68 +1,89 @@
-version: "3"
-
-networks:
-  backend:
-    driver: bridge
-
+version: "3.9"
 volumes:
-  mailcatcher-data:
-    driver: local
-
-  ### ignore folder volume #####
-  var:
-    driver: local
-  vendor:
-    driver: local
-  node_modules:
-    driver: local
+  php-fpm-socket:
+  psysh-store:
+  pma-session-store:
 
 services:
-  ### ECCube4 ##################################
-  ec-cube:
-    ### ローカルでビルドする場合は以下のコマンドを使用します
-    ## docker build -t ec-cube --no-cache --pull --build-arg TAG=8.1-apache .
-    ## docker tag ec-cube ghcr.io/ec-cube/ec-cube-php:8.1-apache
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-ec-cube/ec-cube-php}:${TAG:-8.1-apache}
-    ports:
-      - 8080:80
-      - 4430:443
-    volumes:
-      ### 同期対象からコストの重いフォルダを除外 #####################
-      - "var:/var/www/html/var"
-      - "vendor:/var/www/html/vendor"
-      - "node_modules:/var/www/html/node_modules"
+  
+  # MySQL
+  db:
+    image: mysql5.7:latest
+    # build:
+    #   context: .
+    #   dockerfile: ./.docker/db/Dockerfile
+    container_name: mysql_eccube
     environment:
-      # EC-CUBE environments
-      APP_ENV: "dev"
-      APP_DEBUG: 1
-      DATABASE_URL: "sqlite:///var/eccube.db"
-      DATABASE_SERVER_VERSION: 3
-      DATABASE_CHARSET: 'utf8'
-      MAILER_DSN: "smtp://mailcatcher:1025"
-      ECCUBE_AUTH_MAGIC: "<change.me>"
-      # TRUSTED_HOSTS: '^127.0.0.1$$,^localhost$$'
-      # ECCUBE_LOCALE: "ja"
-      # ECCUBE_TIMEZONE: "Asia/Tokyo"
-      # ECCUBE_CURRENCY: "JPY"
-      # ECCUBE_ADMIN_ROUTE: "admin"
-      # ECCUBE_USER_DATA_ROUTE: "user_data"
-      # ECCUBE_ADMIN_ALLOW_HOSTS: []
-      # ECCUBE_FORCE_SSL: false
-      # ECCUBE_TEMPLATE_CODE: "default"
-      # ECCUBE_COOKIE_NAME: "eccube"
-      # ECCUBE_COOKIE_PATH: "/"
-      # ECCUBE_COOKIE_LIFETIME: 0
-      # ECCUBE_GC_MAXLIFETIME: 1440
-      # ECCUBE_ADMIN_USER: "admin"
-      # ECCUBE_ADMIN_PASS: "password"
-    networks:
-      - backend
-
-  ### Mailcatcher ##################################
-  mailcatcher:
-    image: schickling/mailcatcher
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=local_eccube
+      - MYSQL_USER=docker
+      - MYSQL_PASSWORD=docker
+      - TZ=Asia/Tokyo
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - ./.docker/db/data:/var/lib/mysql
+      - ./.docker/db/sql:/docker-entrypoint-initdb.d
     ports:
-      - "1080:1080"
-      - "1025:1025"
-    networks:
-      - backend
+      - 3306:3306
+
+  # PHP & php-fpm
+  app:
+    image: php8_with_php-fpm_for_laravel:latest
+    # build:
+    #   context: .
+    #   dockerfile: ./.docker/app/Dockerfile
+    volumes:
+      - type: volume
+        source: php-fpm-socket
+        target: /var/run/php-fpm
+        volume:
+          nocopy: true
+      - type: bind
+        source: ./ec-cube
+        target: /work/backend
+      - type: volume
+        source: psysh-store
+        target: /root/.config/psysh
+        volume:
+          nocopy: true
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=local_eccube
+      - DB_USERNAME=docker
+      - DB_PASSWORD=docker
+    
+  # Nginx
+  web:
+    # image: naka0/nginx_and_node_for_laravel:latest
+    build:
+      context: .
+      dockerfile: ./.docker/web/Dockerfile
+    ports:
+      - target: 80
+        published: 8000
+        protocol: tcp
+        mode: host
+    volumes:
+      - type: volume
+        source: php-fpm-socket
+        target: /var/run/php-fpm
+        volume:
+          nocopy: true
+      - type: bind
+        source: ./ec-cube
+        target: /work/backend
+
+  pma:
+    image: phpmyadmin/phpmyadmin:5
+    container_name: ec4_soda_pma
+    depends_on:
+      - db
+    ports:
+      - target: 80
+        published: ${PMA_PUBLISHED_PORT:-18080}
+        protocol: tcp
+        mode: host
+    volumes:
+      - pma-session-store:/sessions
