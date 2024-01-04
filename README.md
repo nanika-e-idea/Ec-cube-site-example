@@ -1,8 +1,11 @@
-# Eccube
+# EC-CUBE4.2系開発環境
 
-+1 標準Eccube開発環境
+Gitpod対応　EC-CUBE4.2系開発環境
 
-## 環境構築
+## Gitpod起動
+アドレスバー"github.com"の前に"gitpod.io#"を追加
+
+## Local環境構築
 ```bash
 $ make init #初回
 $ make migrate #マイグレーション
@@ -18,8 +21,6 @@ $ make up # 開発時
 - node 16
 
 ### アカウント
-
-
 ```
-サンプルユーザー admin@mail.addr ／ 123123
+初期 admin@mail.addr ／ 123123
 ```
